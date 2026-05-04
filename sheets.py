@@ -3,15 +3,22 @@
 
 Структура колонок:
   A  - Номер заказа (нужен)
-  B  - ПВЗ
-  C  - Дата возврата
-  D  - Тип оплаты
-  E  - Сумма возврата
-  F  - Клиент
-  G  - Причина доработки
-  H  - Статус обработки
+  B  - worker_id
+  C  - ПВЗ (нужен)
+  D  - ТУ
+  E  - РУ
+  F  - Дата возврата (нужен)
+  G  - Тип оплаты (нужен)
+  H  - Сумма возврата (нужен)
   I  - Номер заказа (дубликат, не нужен)
-  ... остальные колонки
+  J  - Клиент (нужен)
+  K  - Наличие заявления
+  L  - дней в обработке
+  M  - Причина доработки (нужен)
+  N  - created_timestamp
+  O  - sla_status
+  P  - days_since_created_delay
+  Q  - Статус обработки (нужен)
 """
 
 import csv
@@ -24,7 +31,7 @@ from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
-SHEET_NAME = "Лист1"
+SHEET_NAME = "Апрель 2026"
 
 
 def fetch_refund_rows(spreadsheet_id: str, sheet_name: str = SHEET_NAME, max_retries: int = 3) -> List[Dict]:
@@ -49,19 +56,18 @@ def fetch_refund_rows(spreadsheet_id: str, sheet_name: str = SHEET_NAME, max_ret
                 if i == 0:
                     continue   # заголовок
 
-                if len(row) < 8:
+                if len(row) < 17:  # Минимум до колонки Q
                     continue
 
                 # Берем только нужные колонки
                 order_id = row[0].strip() if len(row) > 0 else ""   # A - Номер заказа
-                pvz = row[1].strip() if len(row) > 1 else ""        # B - ПВЗ
-                date_refund = row[2].strip() if len(row) > 2 else "" # C - Дата возврата
-                payment_type = row[3].strip() if len(row) > 3 else "" # D - Тип оплаты
-                amount = row[4].strip() if len(row) > 4 else ""     # E - Сумма возврата
-                client = row[5].strip() if len(row) > 5 else ""     # F - Клиент
-                reason = row[6].strip() if len(row) > 6 else ""     # G - Причина доработки
-                status = row[7].strip() if len(row) > 7 else ""     # H - Статус обработки
-                # Колонка I (row[8]) - игнорируем, это дубликат номера заказа
+                pvz = row[2].strip() if len(row) > 2 else ""        # C - ПВЗ
+                date_refund = row[5].strip() if len(row) > 5 else "" # F - Дата возврата
+                payment_type = row[6].strip() if len(row) > 6 else "" # G - Тип оплаты
+                amount = row[7].strip() if len(row) > 7 else ""     # H - Сумма возврата
+                client = row[9].strip() if len(row) > 9 else ""     # J - Клиент
+                reason = row[12].strip() if len(row) > 12 else ""   # M - Причина доработки
+                status = row[16].strip() if len(row) > 16 else ""   # Q - Статус обработки
 
                 if not order_id or not pvz:
                     continue
