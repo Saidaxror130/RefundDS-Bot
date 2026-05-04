@@ -4,13 +4,13 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from sheets import fetch_refund_rows
 from cache import load_cache, save_cache, get_changes
-from filters import filter_our_data
+from filters import filter_our_data, OUR_PVZ
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -183,6 +183,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "👋 <b>Бот возвратов ДС</b>\n\n"
         "Команды:\n"
         "/refresh — проверить таблицу\n"
+        "/pvz — выбрать ПВЗ\n"
         "/all — все ошибки\n"
         "/new — новые ошибки\n"
         "/contacted — связались с клиентом\n"
@@ -375,6 +376,127 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ Ошибка: {e}")
 
+# ─── PVZ NAVIGATION ────────────────────────────────────────────────────────────
+@owner_only
+async def cmd_pvz(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Показать список ПВЗ с кнопками."""
+    keyboard = []
+    sorted_pvz = sorted(OUR_PVZ)
+
+    # Создаем кнопки по 3 в ряд
+    row = []
+    for pvz in sorted_pvz:
+        row.append(InlineKeyboardButton(pvz, callback_data=f"pvz:{pvz}"))
+        if len(row) == 3:
+            keyboard.append(row)
+            row = []
+
+    # Добавляем оставшиеся кнопки
+    if row:
+        keyboard.append(row)
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🏪 <b>Выберите ПВЗ:</b>",
+        reply_markup=reply_markup,
+        parse_mode="HTML"
+    )
+
+async def pvz_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Обработка нажатия на кнопку ПВЗ."""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+
+    if data == "pvz:back":
+        # Возвращаемся к списку ПВЗ
+        keyboard = []
+        sorted_pvz = sorted(OUR_PVZ)
+
+        row = []
+        for pvz in sorted_pvz:
+            row.append(InlineKeyboardButton(pvz, callback_data=f"pvz:{pvz}"))
+            if len(row) == 3:
+                keyboard.append(row)
+                row = []
+
+        if row:
+            keyboard.append(row)
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        await query.edit_message_text(
+            "🏪 <b>Выберите ПВЗ:</b>",
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        )
+        return
+
+    # Показываем данные по выбранному ПВЗ
+    if data.startswith("pvz:"):
+        selected_pvz = data[4:]  # убираем "pvz:"
+
+        try:
+            all_rows = await asyncio.to_thread(fetch_refund_rows, SPREADSHEET_ID)
+            our_rows = filter_our_data(all_rows)
+
+            # Фильтруем по выбранному ПВЗ
+            pvz_rows = [r for r in our_rows if r.get("pvz") == selected_pvz]
+
+            if not pvz_rows:
+                keyboard = [[InlineKeyboardButton("« Назад", callback_data="pvz:back")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+
+                await query.edit_message_text(
+                    f"🏪 <b>{selected_pvz}</b>\n\n✅ Ошибок нет!",
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+                return
+
+            # Группируем по статусам
+            groups = group_by_status(pvz_rows)
+
+            parts = [f"🏪 <b>{selected_pvz}</b> ({len(pvz_rows)} шт.)\n"]
+
+            for key, label in [
+                ("new", "🆕 Новые"),
+                ("contacted", "📞 Связались"),
+                ("no_contact", "❌ Не выходит"),
+                ("refused", "⏸ Отказывается"),
+                ("completed", "✅ Обработаны")
+            ]:
+                if groups[key]:
+                    parts.append(f"\n<b>{label} ({len(groups[key])} шт.):</b>")
+                    for r in groups[key]:
+                        parts.append(format_refund(r))
+                        parts.append("")
+
+            msg = "\n".join(parts)
+
+            # Кнопка "Назад"
+            keyboard = [[InlineKeyboardButton("« Назад", callback_data="pvz:back")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+
+            # Разбиваем на части если слишком длинное
+            if len(msg) > 4000:
+                chunks = [msg[i:i+4000] for i in range(0, len(msg), 4000)]
+                await query.edit_message_text(chunks[0], parse_mode="HTML", reply_markup=reply_markup)
+                for chunk in chunks[1:]:
+                    await query.message.reply_text(chunk, parse_mode="HTML")
+            else:
+                await query.edit_message_text(msg, reply_markup=reply_markup, parse_mode="HTML")
+
+        except Exception as e:
+            keyboard = [[InlineKeyboardButton("« Назад", callback_data="pvz:back")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                f"❌ Ошибка: {e}",
+                reply_markup=reply_markup
+            )
+
 # ─── MAIN ──────────────────────────────────────────────────────────────────────
 async def post_init(app: Application):
     scheduler = AsyncIOScheduler()
@@ -401,6 +523,7 @@ def main():
 
         app.add_handler(CommandHandler("start", cmd_start))
         app.add_handler(CommandHandler("refresh", cmd_refresh))
+        app.add_handler(CommandHandler("pvz", cmd_pvz))
         app.add_handler(CommandHandler("all", cmd_all))
         app.add_handler(CommandHandler("new", cmd_new))
         app.add_handler(CommandHandler("contacted", cmd_contacted))
@@ -408,6 +531,7 @@ def main():
         app.add_handler(CommandHandler("refused", cmd_refused))
         app.add_handler(CommandHandler("completed", cmd_completed))
         app.add_handler(CommandHandler("status", cmd_status))
+        app.add_handler(CallbackQueryHandler(pvz_callback))
 
         logger.info("🚀 Бот возвратов запущен")
         app.run_polling(drop_pending_updates=True)
