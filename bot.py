@@ -62,8 +62,8 @@ def format_refund(r: dict, show_full_reason: bool = False) -> str:
     status = r.get("status", "Новая ошибка")
 
     # Сокращаем длинную причину
-    if not show_full_reason and len(reason) > 100:
-        reason = reason[:97] + "..."
+    if not show_full_reason and len(reason) > 50:
+        reason = reason[:47] + "..."
 
     status_emoji = {
         "": "🆕",
@@ -74,14 +74,17 @@ def format_refund(r: dict, show_full_reason: bool = False) -> str:
     }
     emoji = status_emoji.get(status, "❓")
 
+    # Компактный формат для мобильного
     lines = [
-        f"{emoji} <b>Заказ {order_id}</b> | {pvz}",
-        f"   💰 {amount} ({payment_type})",
-        f"   📅 {date}",
-        f"   👤 {client}",
-        f"   📝 {reason}",
-        f"   📊 Статус: {status if status else 'Новая ошибка'}"
+        f"{emoji} <b>{order_id}</b> | {pvz}",
+        f"💰 {amount} ({payment_type}) | 📅 {date}",
+        f"👤 {client}"
     ]
+
+    # Добавляем причину только если она не пустая
+    if reason and reason != "—":
+        lines.append(f"📝 {reason}")
+
     return "\n".join(lines)
 
 def group_by_status(rows: list) -> dict:
@@ -148,18 +151,20 @@ async def check_and_notify(app: Application, manual: bool = False):
         parts.append(f"🆕 <b>Новые ошибки ({len(changes['added'])} шт.):</b>")
         for r in changes["added"]:
             parts.append(format_refund(r))
+            parts.append("")  # пустая строка
 
     if changes["removed"]:
         parts.append(f"\n✅ <b>Устранены ({len(changes['removed'])} шт.):</b>")
         for r in changes["removed"]:
-            parts.append(f"   • Заказ {r.get('order_id')} | {r.get('pvz')}")
+            parts.append(f"• Заказ {r.get('order_id')} | {r.get('pvz')}")
 
     if changes["modified"]:
         parts.append(f"\n🔄 <b>Изменены ({len(changes['modified'])} шт.):</b>")
         for old, new in changes["modified"]:
-            parts.append(f"   • Заказ {new.get('order_id')} | {new.get('pvz')}")
-            parts.append(f"     Было: {old.get('status', 'Новая ошибка')}")
-            parts.append(f"     Стало: {new.get('status', 'Новая ошибка')}")
+            parts.append(f"• Заказ {new.get('order_id')} | {new.get('pvz')}")
+            parts.append(f"  Было: {old.get('status', 'Новая ошибка')}")
+            parts.append(f"  Стало: {new.get('status', 'Новая ошибка')}")
+            parts.append("")  # пустая строка
 
     msg = "\n".join(parts)
 
@@ -218,6 +223,7 @@ async def cmd_all(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 parts.append(f"\n<b>{label} ({len(groups[key])} шт.):</b>")
                 for r in groups[key]:
                     parts.append(format_refund(r))
+                    parts.append("")  # пустая строка между записями
 
         msg = "\n".join(parts)
 
@@ -246,6 +252,7 @@ async def cmd_new(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = [f"🆕 <b>Новые ошибки ({len(groups['new'])} шт.):</b>\n"]
         for r in groups["new"]:
             parts.append(format_refund(r))
+            parts.append("")  # пустая строка
 
         msg = "\n".join(parts)
         await update.message.reply_text(msg, parse_mode="HTML")
@@ -267,6 +274,7 @@ async def cmd_contacted(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = [f"📞 <b>Связались с клиентом ({len(groups['contacted'])} шт.):</b>\n"]
         for r in groups["contacted"]:
             parts.append(format_refund(r))
+            parts.append("")  # пустая строка
 
         msg = "\n".join(parts)
         await update.message.reply_text(msg, parse_mode="HTML")
@@ -288,6 +296,7 @@ async def cmd_no_contact(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = [f"❌ <b>Клиент не выходит на связь ({len(groups['no_contact'])} шт.):</b>\n"]
         for r in groups["no_contact"]:
             parts.append(format_refund(r))
+            parts.append("")  # пустая строка
 
         msg = "\n".join(parts)
         await update.message.reply_text(msg, parse_mode="HTML")
@@ -309,6 +318,7 @@ async def cmd_refused(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = [f"⏸ <b>Клиент отказывается ({len(groups['refused'])} шт.):</b>\n"]
         for r in groups["refused"]:
             parts.append(format_refund(r))
+            parts.append("")  # пустая строка
 
         msg = "\n".join(parts)
         await update.message.reply_text(msg, parse_mode="HTML")
@@ -330,6 +340,7 @@ async def cmd_completed(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = [f"✅ <b>Обработаны ({len(groups['completed'])} шт.):</b>\n"]
         for r in groups["completed"]:
             parts.append(format_refund(r))
+            parts.append("")  # пустая строка
 
         msg = "\n".join(parts)
         await update.message.reply_text(msg, parse_mode="HTML")
