@@ -21,8 +21,9 @@ def normalize_pvz(name: str) -> str:
         name.upper()
         .replace("TAШ", "ТАШ")
         .replace("ТAШ", "ТАШ")
-        .replace("FRТАШ", "FRТАШ")
-        .replace("FRTАШ", "FRТАШ")
+        .replace("FRТАШ", "FrТАШ")
+        .replace("FRTАШ", "FrТАШ")
+        .replace("FR", "Fr")  # нормализуем Fr
         .strip()
     )
 
