@@ -23,15 +23,27 @@
 
 import csv
 import io
+import os
 import urllib.parse
 import urllib.request
 import time
 import logging
+from datetime import datetime
 from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
-SHEET_NAME = "Апрель 2026"
+def get_current_sheet_name() -> str:
+    """Автоматически определяет название листа по текущему месяцу и году."""
+    months_ru = {
+        1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель",
+        5: "Май", 6: "Июнь", 7: "Июль", 8: "Август",
+        9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь"
+    }
+    now = datetime.now()
+    return f"{months_ru[now.month]} {now.year}"
+
+SHEET_NAME = os.environ.get("SHEET_NAME", get_current_sheet_name())
 
 
 def fetch_refund_rows(spreadsheet_id: str, sheet_name: str = SHEET_NAME, max_retries: int = 3) -> List[Dict]:
