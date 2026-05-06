@@ -50,7 +50,7 @@ def owner_only(func):
     return wrapper
 
 # ─── HELPERS ───────────────────────────────────────────────────────────────────
-def format_refund(r: dict, show_full_reason: bool = False) -> str:
+def format_refund(r: dict) -> str:
     """Форматирует одну запись о возврате."""
     order_id = r.get("order_id", "—")
     pvz = r.get("pvz", "—")
@@ -60,10 +60,6 @@ def format_refund(r: dict, show_full_reason: bool = False) -> str:
     client = r.get("client", "—")
     reason = r.get("reason", "—")
     status = r.get("status", "Новая ошибка")
-
-    # Сокращаем длинную причину
-    if not show_full_reason and len(reason) > 50:
-        reason = reason[:47] + "..."
 
     status_emoji = {
         "": "🆕",
