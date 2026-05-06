@@ -11,14 +11,15 @@
   G  - short_name / ПВЗ (нужен)
   H  - Тип оплаты (нужен)
   I  - Сумма возврата (нужен)
-  J  - Статус возврата
+  J  - Статус возврата (NEED_TO_PROCESS_MANUALLY)
   K  - Клиент (нужен)
   L  - Наличие заявления
   M  - days_since_created
   N  - error_list_translated / Причина доработки (нужен)
   O  - created_timestamp
-  P  - sla_status / Статус обработки (нужен)
+  P  - sla_status (SLA на исходе / В рамках SLA / SLA просрочен)
   Q  - days_since_created_delay
+  R  - Статус обработки (нужен) - без заголовка
 """
 
 import csv
@@ -65,7 +66,7 @@ def fetch_refund_rows(spreadsheet_id: str, sheet_name: str = SHEET_NAME, max_ret
                 if i == 0:
                     continue   # заголовок
 
-                if len(row) < 16:  # Минимум до колонки P
+                if len(row) < 18:  # Минимум до колонки R
                     continue
 
                 # Берем только нужные колонки (новая структура Май 2026)
@@ -76,7 +77,7 @@ def fetch_refund_rows(spreadsheet_id: str, sheet_name: str = SHEET_NAME, max_ret
                 amount = row[8].strip() if len(row) > 8 else ""     # I - Сумма возврата
                 client = row[10].strip() if len(row) > 10 else ""   # K - Клиент
                 reason = row[13].strip() if len(row) > 13 else ""   # N - error_list_translated
-                status = row[15].strip() if len(row) > 15 else ""   # P - sla_status
+                status = row[17].strip() if len(row) > 17 else ""   # R - Статус обработки
 
                 if not order_id or not pvz:
                     continue
