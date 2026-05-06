@@ -130,6 +130,12 @@ async def check_and_notify(app: Application, manual: bool = False):
     # Фильтруем только наши данные
     our_rows = filter_our_data(all_rows)
 
+    # Логируем для отладки
+    if len(our_rows) == 0 and len(all_rows) > 0:
+        # Показываем какие ПВЗ есть в таблице
+        unique_pvz = set(r.get("pvz", "") for r in all_rows if r.get("pvz"))
+        logger.warning(f"Наших ПВЗ не найдено. ПВЗ в таблице: {sorted(unique_pvz)[:20]}")  # первые 20
+
     # Получаем изменения
     changes = get_changes(our_rows)
 
