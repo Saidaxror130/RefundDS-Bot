@@ -1,24 +1,24 @@
 """
 Читает данные из Google Sheets через публичный CSV-экспорт.
 
-Структура колонок:
+Структура колонок (Май 2026):
   A  - Номер заказа (нужен)
   B  - worker_id
-  C  - ПВЗ (нужен)
-  D  - ТУ
-  E  - РУ
-  F  - Дата возврата (нужен)
-  G  - Тип оплаты (нужен)
-  H  - Сумма возврата (нужен)
-  I  - Номер заказа (дубликат, не нужен)
-  J  - Клиент (нужен)
-  K  - Наличие заявления
-  L  - дней в обработке
-  M  - Причина доработки (нужен)
-  N  - created_timestamp
-  O  - sla_status
-  P  - days_since_created_delay
-  Q  - Статус обработки (нужен)
+  C  - ТУ
+  D  - РУ
+  E  - Дата возврата (нужен)
+  F  - колл
+  G  - short_name / ПВЗ (нужен)
+  H  - Тип оплаты (нужен)
+  I  - Сумма возврата (нужен)
+  J  - Статус возврата
+  K  - Клиент (нужен)
+  L  - Наличие заявления
+  M  - days_since_created
+  N  - error_list_translated / Причина доработки (нужен)
+  O  - created_timestamp
+  P  - sla_status / Статус обработки (нужен)
+  Q  - days_since_created_delay
 """
 
 import csv
@@ -65,18 +65,18 @@ def fetch_refund_rows(spreadsheet_id: str, sheet_name: str = SHEET_NAME, max_ret
                 if i == 0:
                     continue   # заголовок
 
-                if len(row) < 17:  # Минимум до колонки Q
+                if len(row) < 16:  # Минимум до колонки P
                     continue
 
-                # Берем только нужные колонки
+                # Берем только нужные колонки (новая структура Май 2026)
                 order_id = row[0].strip() if len(row) > 0 else ""   # A - Номер заказа
-                pvz = row[2].strip() if len(row) > 2 else ""        # C - ПВЗ
-                date_refund = row[5].strip() if len(row) > 5 else "" # F - Дата возврата
-                payment_type = row[6].strip() if len(row) > 6 else "" # G - Тип оплаты
-                amount = row[7].strip() if len(row) > 7 else ""     # H - Сумма возврата
-                client = row[9].strip() if len(row) > 9 else ""     # J - Клиент
-                reason = row[12].strip() if len(row) > 12 else ""   # M - Причина доработки
-                status = row[16].strip() if len(row) > 16 else ""   # Q - Статус обработки
+                pvz = row[6].strip() if len(row) > 6 else ""        # G - short_name (ПВЗ)
+                date_refund = row[4].strip() if len(row) > 4 else "" # E - Дата возврата
+                payment_type = row[7].strip() if len(row) > 7 else "" # H - Тип оплаты
+                amount = row[8].strip() if len(row) > 8 else ""     # I - Сумма возврата
+                client = row[10].strip() if len(row) > 10 else ""   # K - Клиент
+                reason = row[13].strip() if len(row) > 13 else ""   # N - error_list_translated
+                status = row[15].strip() if len(row) > 15 else ""   # P - sla_status
 
                 if not order_id or not pvz:
                     continue
