@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
 BOT_TOKEN      = os.environ["BOT_TOKEN"]
 SPREADSHEET_ID = os.environ["SPREADSHEET_ID"]
-OWNER_ID       = 6061065577
+OWNER_ID       = int(os.environ["OWNER_ID"])
 TIMEZONE       = ZoneInfo("Asia/Tashkent")
 CHECK_INTERVAL_HOURS = int(os.environ.get("CHECK_INTERVAL_HOURS", "1"))
 
@@ -83,7 +83,17 @@ def format_refund(r: dict, show_full_reason: bool = False) -> str:
 
     # Добавляем причину только если она не пустая
     if reason and reason != "—":
-        lines.append(f"📝 {reason}")
+        # Если причин несколько (через запятую), форматируем списком
+        if "," in reason:
+            reasons_list = [r.strip() for r in reason.split(",") if r.strip()]
+            if len(reasons_list) > 1:
+                lines.append("📝 Причины:")
+                for i, r in enumerate(reasons_list, 1):
+                    lines.append(f"   {i}. {r}")
+            else:
+                lines.append(f"📝 {reason}")
+        else:
+            lines.append(f"📝 {reason}")
 
     return "\n".join(lines)
 
