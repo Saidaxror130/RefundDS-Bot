@@ -23,7 +23,7 @@ BOT_TOKEN      = os.environ["BOT_TOKEN"]
 SPREADSHEET_ID = os.environ["SPREADSHEET_ID"]
 OWNER_ID       = 6061065577
 TIMEZONE       = ZoneInfo("Asia/Tashkent")
-CHECK_INTERVAL_HOURS = int(os.environ.get("CHECK_INTERVAL_HOURS", "5"))
+CHECK_INTERVAL_HOURS = int(os.environ.get("CHECK_INTERVAL_HOURS", "1"))
 
 def now_local():
     """Возвращает текущее время в часовом поясе Ташкента."""
@@ -120,12 +120,11 @@ async def check_and_notify(app: Application, manual: bool = False):
         all_rows = await asyncio.to_thread(fetch_refund_rows, SPREADSHEET_ID)
     except Exception as e:
         logger.error(f"Ошибка при чтении таблицы: {e}", exc_info=True)
-        if manual:
-            await app.bot.send_message(
-                OWNER_ID,
-                f"❌ <b>Ошибка при загрузке таблицы</b>\n\n<code>{str(e)}</code>",
-                parse_mode="HTML"
-            )
+        await app.bot.send_message(
+            OWNER_ID,
+            f"❌ <b>Ошибка при загрузке таблицы</b>\n\n<code>{str(e)}</code>",
+            parse_mode="HTML"
+        )
         return
 
     # Фильтруем только наши данные
@@ -134,36 +133,50 @@ async def check_and_notify(app: Application, manual: bool = False):
     # Получаем изменения
     changes = get_changes(our_rows)
 
-    if not changes["added"] and not changes["removed"] and not changes["modified"]:
-        if manual:
-            await app.bot.send_message(
-                OWNER_ID,
-                f"✅ <b>Новых изменений нет</b>\n\n"
-                f"Всего строк: {len(all_rows)}, наших: {len(our_rows)}",
-                parse_mode="HTML"
-            )
+    if not changes["added"] and not changes["removed"] and not changes["status_updated"]:
+        await app.bot.send_message(
+            OWNER_ID,
+            f"✅ <b>Новых изменений нет</b>\n\n"
+            f"Всего строк: {len(all_rows)}, наших: {len(our_rows)}",
+            parse_mode="HTML"
+        )
         return
 
     # Формируем сообщение об изменениях
     parts = []
 
     if changes["added"]:
-        parts.append(f"🆕 <b>Новые ошибки ({len(changes['added'])} шт.):</b>")
+        parts.append(f"➕ <b>Добавлено в таблицу ({len(changes['added'])} шт.):</b>")
         for r in changes["added"]:
-            parts.append(format_refund(r))
+            status = r.get("status", "").strip()
+            if not status:
+                parts.append(f"🆕 Заказ <b>{r.get('order_id')}</b> | {r.get('pvz')}")
+                parts.append(f"   Добавлен в таблицу (статус пустой)")
+            else:
+                parts.append(format_refund(r))
             parts.append("")  # пустая строка
 
     if changes["removed"]:
-        parts.append(f"\n✅ <b>Устранены ({len(changes['removed'])} шт.):</b>")
+        parts.append(f"\n🗑 <b>Убрано из таблицы ({len(changes['removed'])} шт.):</b>")
         for r in changes["removed"]:
-            parts.append(f"• Заказ {r.get('order_id')} | {r.get('pvz')}")
+            parts.append(f"• Заказ <b>{r.get('order_id')}</b> | {r.get('pvz')}")
+            parts.append("")
 
-    if changes["modified"]:
-        parts.append(f"\n🔄 <b>Изменены ({len(changes['modified'])} шт.):</b>")
-        for old, new in changes["modified"]:
-            parts.append(f"• Заказ {new.get('order_id')} | {new.get('pvz')}")
-            parts.append(f"  Было: {old.get('status', 'Новая ошибка')}")
-            parts.append(f"  Стало: {new.get('status', 'Новая ошибка')}")
+    if changes["status_updated"]:
+        parts.append(f"\n🔄 <b>Статус обновлен ({len(changes['status_updated'])} шт.):</b>")
+        for old, new in changes["status_updated"]:
+            old_status = old.get('status', '').strip()
+            new_status = new.get('status', '').strip()
+
+            parts.append(f"📦 Заказ <b>{new.get('order_id')}</b> | {new.get('pvz')}")
+
+            if not old_status and new_status:
+                parts.append(f"   Статус установлен: <b>{new_status}</b>")
+            elif old_status and not new_status:
+                parts.append(f"   Статус очищен (был: {old_status})")
+            else:
+                parts.append(f"   Было: {old_status if old_status else '(пусто)'}")
+                parts.append(f"   Стало: <b>{new_status if new_status else '(пусто)'}</b>")
             parts.append("")  # пустая строка
 
     msg = "\n".join(parts)

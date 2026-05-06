@@ -35,8 +35,8 @@ def save_cache(data: Dict[str, Any]) -> None:
 
 
 def row_key(r: dict) -> str:
-    """Создает уникальный ключ для строки."""
-    return f"{r.get('order_id')}|{r.get('pvz')}|{r.get('status', '')}"
+    """Создает уникальный ключ для строки (без статуса, чтобы отслеживать изменения)."""
+    return f"{r.get('order_id')}|{r.get('pvz')}"
 
 
 def get_changes(new_rows: List[Dict]) -> Dict[str, List]:
@@ -45,9 +45,9 @@ def get_changes(new_rows: List[Dict]) -> Dict[str, List]:
 
     Returns:
         {
-            "added": [...],      # новые записи
-            "removed": [...],    # удаленные записи
-            "modified": [(old, new), ...]  # измененные записи
+            "added": [...],      # новые записи (добавлены в таблицу)
+            "removed": [...],    # удаленные записи (убраны из таблицы)
+            "status_updated": [(old, new), ...]  # изменения статуса
         }
     """
     cache = load_cache()
@@ -61,7 +61,7 @@ def get_changes(new_rows: List[Dict]) -> Dict[str, List]:
         return {
             "added": new_rows,
             "removed": [],
-            "modified": []
+            "status_updated": []
         }
 
     # Сдвигаем кеши: current -> previous, new_rows -> current
@@ -78,26 +78,28 @@ def get_changes(new_rows: List[Dict]) -> Dict[str, List]:
     old_keys = set(old_dict.keys())
     new_keys = set(new_dict.keys())
 
-    # Находим изменения
+    # Находим добавленные и удаленные заказы
     added = [new_dict[k] for k in (new_keys - old_keys)]
     removed = [old_dict[k] for k in (old_keys - new_keys)]
 
-    # Находим измененные (одинаковый order_id+pvz, но разный статус)
-    modified = []
+    # Находим изменения статуса
+    status_updated = []
     common_keys = old_keys & new_keys
     for k in common_keys:
         old_r = old_dict[k]
         new_r = new_dict[k]
-        # Проверяем изменился ли статус или другие поля
-        if (old_r.get("status") != new_r.get("status") or
-            old_r.get("reason") != new_r.get("reason") or
-            old_r.get("amount") != new_r.get("amount")):
-            modified.append((old_r, new_r))
+
+        old_status = old_r.get("status", "").strip()
+        new_status = new_r.get("status", "").strip()
+
+        # Если статус изменился
+        if old_status != new_status:
+            status_updated.append((old_r, new_r))
 
     return {
         "added": added,
         "removed": removed,
-        "modified": modified
+        "status_updated": status_updated
     }
 
 
